@@ -4,8 +4,18 @@
 #include <ctype.h>
 #include <time.h>
 
-const char* palavra() {
-    const char* palavras[] = {
+#define TOTAL_PALAVRAS 50
+#define TAM_PALAVRA 5
+#define MAX_TENTATIVAS 6
+
+typedef enum {
+    LETRA_ERRADA,
+    LETRA_POSICAO_ERRADA,
+    LETRA_CORRETA
+} StatusLetra;
+
+const char* palavra(void) {
+    static const char* palavras[TOTAL_PALAVRAS] = {
         "AMIGO", "BOLSA", "CANSA", "DENTE", "ESTRE", "FALTA", "GOLPE", "HORAS", "IGUAL", "JANTA",
         "LUGAR", "MUNDO", "NORTE", "OLHOS", "POUCO", "QUASE", "RAPAZ", "SORTE", "TERRA", "UNICO",
         "VISTA", "XADRE", "ZEBRA", "ARDOR", "BANDO", "CRIME", "DONOS", "ESCOL", "FAROL", "GARFO",
@@ -13,95 +23,223 @@ const char* palavra() {
         "SAUDA", "TEMPO", "URUBU", "VINHO", "WAFER", "YEAST", "ZULUS", "BRAVO", "CHAVE", "DIZEM"
     };
 
-    int selecionador = rand() % 50;
-    return palavras[selecionador];
+    return palavras[rand() % TOTAL_PALAVRAS];
+}
+
+void limpar_tela(void) {
+    printf("\033[2J\033[H");
 }
 
 void maiusculo(char* str) {
     for (int i = 0; str[i] != '\0'; i++) {
-        str[i] = toupper(str[i]);
+        str[i] = (char) toupper((unsigned char) str[i]);
     }
+}
+
+void remover_quebra_linha(char* str) {
+    str[strcspn(str, "\n")] = '\0';
 }
 
 int corretor(const char* tentativa) {
-    if (strlen(tentativa) != 5) {
-        printf("So pode palavras com 5 letras! Tente novamente.\n");
+    if ((int) strlen(tentativa) != TAM_PALAVRA) {
         return 0;
     }
+
+    for (int i = 0; i < TAM_PALAVRA; i++) {
+        if (!isalpha((unsigned char) tentativa[i])) {
+            return 0;
+        }
+    }
+
     return 1;
 }
 
-void feedback(const char* tentativa, const char* palavra_esc) {
-    for (int i = 0; i < 5; i++) {
+void calcular_status(const char* tentativa, const char* palavra_esc, StatusLetra status[TAM_PALAVRA]) {
+    for (int i = 0; i < TAM_PALAVRA; i++) {
         if (tentativa[i] == palavra_esc[i]) {
-            printf("\033[0;32m%c\033[0m", tentativa[i]);
+            status[i] = LETRA_CORRETA;
         } else {
-            int letra_lug_errado = 0;
-            for (int j = 0; j < 5; j++) {
+            status[i] = LETRA_ERRADA;
+            for (int j = 0; j < TAM_PALAVRA; j++) {
                 if (tentativa[i] == palavra_esc[j]) {
-                    letra_lug_errado = 1;
+                    status[i] = LETRA_POSICAO_ERRADA;
                     break;
                 }
             }
-            if (letra_lug_errado) {
-                printf("\033[1;33m%c\033[0m", tentativa[i]);
-            } else {
-                printf("%c", tentativa[i]);
-            }
         }
     }
+}
+
+void imprimir_bloco_letra(char letra, StatusLetra status) {
+    if (status == LETRA_CORRETA) {
+        printf("\033[42;30m %c \033[0m", letra);
+    } else if (status == LETRA_POSICAO_ERRADA) {
+        printf("\033[43;30m %c \033[0m", letra);
+    } else {
+        printf("\033[100;97m %c \033[0m", letra);
+    }
+}
+
+void desenhar_tela(char tentativas[MAX_TENTATIVAS][TAM_PALAVRA + 1], int total_tentativas, const char* mensagem) {
+    limpar_tela();
+
+    printf("=======================================\n");
+    printf("         TERMO - MODO TERMINAL         \n");
+    printf("=======================================\n\n");
+
+    printf("Acerte a palavra de %d letras em %d tentativas.\n", TAM_PALAVRA, MAX_TENTATIVAS);
+    printf("Legenda: \033[42;30m certo \033[0m  \033[43;30m existe \033[0m  \033[100;97m nao existe \033[0m\n\n");
+
+    printf("Tabuleiro:\n");
+    for (int i = 0; i < MAX_TENTATIVAS; i++) {
+        printf("%d | ", i + 1);
+        if (i < total_tentativas) {
+            for (int j = 0; j < TAM_PALAVRA; j++) {
+                printf(" %c ", tentativas[i][j]);
+            }
+        } else {
+            for (int j = 0; j < TAM_PALAVRA; j++) {
+                printf(" _ ");
+            }
+        }
+        printf("\n");
+    }
+
+    if (mensagem != NULL && mensagem[0] != '\0') {
+        printf("\n%s\n", mensagem);
+    }
+
     printf("\n");
 }
 
-int main() {
-    int vida;
-    char tentativa[6];
+void desenhar_feedback(char tentativas[MAX_TENTATIVAS][TAM_PALAVRA + 1],
+                       StatusLetra historico[MAX_TENTATIVAS][TAM_PALAVRA],
+                       int total_tentativas,
+                       const char* mensagem) {
+    limpar_tela();
+
+    printf("=======================================\n");
+    printf("         TERMO - MODO TERMINAL         \n");
+    printf("=======================================\n\n");
+
+    printf("Acerte a palavra de %d letras em %d tentativas.\n", TAM_PALAVRA, MAX_TENTATIVAS);
+    printf("Legenda: \033[42;30m certo \033[0m  \033[43;30m existe \033[0m  \033[100;97m nao existe \033[0m\n\n");
+
+    printf("Tabuleiro:\n");
+    for (int i = 0; i < MAX_TENTATIVAS; i++) {
+        printf("%d | ", i + 1);
+        if (i < total_tentativas) {
+            for (int j = 0; j < TAM_PALAVRA; j++) {
+                imprimir_bloco_letra(tentativas[i][j], historico[i][j]);
+                printf(" ");
+            }
+        } else {
+            for (int j = 0; j < TAM_PALAVRA; j++) {
+                printf(" _ ");
+            }
+        }
+        printf("\n");
+    }
+
+    if (mensagem != NULL && mensagem[0] != '\0') {
+        printf("\n%s\n", mensagem);
+    }
+
+    printf("\n");
+}
+
+int ler_linha(char* buffer, size_t tamanho) {
+    if (fgets(buffer, (int) tamanho, stdin) == NULL) {
+        return 0;
+    }
+
+    remover_quebra_linha(buffer);
+    return 1;
+}
+
+int ler_opcao_jogo(const char* mensagem) {
+    char linha[16];
+
+    while (1) {
+        printf("%s", mensagem);
+        if (!ler_linha(linha, sizeof(linha))) {
+            return 0;
+        }
+
+        if (strcmp(linha, "1") == 0) {
+            return 1;
+        }
+        if (strcmp(linha, "0") == 0) {
+            return 0;
+        }
+
+        printf("Opcao invalida. Digite 1 para sim ou 0 para nao.\n");
+    }
+}
+
+int main(void) {
     int jogar;
+    char tentativas[MAX_TENTATIVAS][TAM_PALAVRA + 1];
+    StatusLetra historico[MAX_TENTATIVAS][TAM_PALAVRA];
+    char entrada[64];
+    char mensagem[128];
 
-    srand(time(NULL));
+    srand((unsigned int) time(NULL));
 
-    printf("Antes de comecar, atente-se as regras!\n");
-    printf("- Voce tem 6 vidas para acertar a palavra\n");
-    printf("- So sao aceitas palavras com 5 letras\n");
-    printf("- As dicas vao aparecer com cores:\n");
-    printf("- \033[0;32mVERDE\033[0m = letra no lugar certo\n");
-    printf("- \033[1;33mAMARELO\033[0m = letra certa no lugar errado\n\n");
+    limpar_tela();
+    printf("Bem-vindo ao TERMO!\n\n");
+    printf("Regras:\n");
+    printf("- Voce tem %d tentativas para acertar a palavra.\n", MAX_TENTATIVAS);
+    printf("- Apenas palavras com %d letras sao aceitas.\n", TAM_PALAVRA);
+    printf("- As letras aparecem coloridas para indicar o resultado de cada jogada.\n\n");
 
-    printf("Deseja jogar? (1 = sim / 0 = nao): ");
-    scanf("%d", &jogar);
+    jogar = ler_opcao_jogo("Deseja jogar? (1 = sim / 0 = nao): ");
 
     while (jogar == 1) {
         const char* palavra_esc = palavra();
+        int venceu = 0;
+        int total_tentativas = 0;
 
-        printf("\nUma nova palavra foi escolhida!\n");
+        strcpy(mensagem, "Digite uma palavra de 5 letras para comecar.");
 
-        for (vida = 0; vida < 6; vida++) {
-            printf("\nTentativa %d: ", vida + 1);
-            scanf("%s", tentativa);
-            maiusculo(tentativa);
+        while (total_tentativas < MAX_TENTATIVAS) {
+            desenhar_feedback(tentativas, historico, total_tentativas, mensagem);
+            printf("Tentativa %d/%d: ", total_tentativas + 1, MAX_TENTATIVAS);
 
-            if (!corretor(tentativa)) {
-                vida--;
+            if (!ler_linha(entrada, sizeof(entrada))) {
+                printf("\nErro ao ler a entrada. Encerrando o jogo.\n");
+                return 1;
+            }
+
+            maiusculo(entrada);
+
+            if (!corretor(entrada)) {
+                strcpy(mensagem, "Entrada invalida! Digite apenas uma palavra com 5 letras.");
                 continue;
             }
 
-            if (strcmp(tentativa, palavra_esc) == 0) {
-                printf("\nParabens, voce acertou a palavra!!!\n");
+            strcpy(tentativas[total_tentativas], entrada);
+            calcular_status(entrada, palavra_esc, historico[total_tentativas]);
+            total_tentativas++;
+
+            if (strcmp(entrada, palavra_esc) == 0) {
+                venceu = 1;
+                strcpy(mensagem, "Parabens! Voce acertou a palavra.");
                 break;
-            } else {
-                feedback(tentativa, palavra_esc);
             }
+
+            snprintf(mensagem, sizeof(mensagem), "A palavra ainda nao foi encontrada. Restam %d tentativa(s).",
+                     MAX_TENTATIVAS - total_tentativas);
         }
 
-        if (strcmp(tentativa, palavra_esc) != 0) {
-            printf("\nVoce perdeu! A palavra era: %s\n", palavra_esc);
+        if (!venceu) {
+            snprintf(mensagem, sizeof(mensagem), "Fim de jogo! A palavra correta era %s.", palavra_esc);
         }
 
-        printf("\nDeseja jogar novamente? (1 = sim / 0 = nao): ");
-        scanf("%d", &jogar);
+        desenhar_feedback(tentativas, historico, total_tentativas, mensagem);
+        jogar = ler_opcao_jogo("Deseja jogar novamente? (1 = sim / 0 = nao): ");
     }
 
-    printf("\nValeu por jogar! Ate a proxima\n");
-
+    printf("\nValeu por jogar! Ate a proxima.\n");
     return 0;
 }
